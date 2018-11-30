@@ -5,6 +5,7 @@
 #include "CL/cl.hpp"
 #include "CL/err_code.h"
 #include "CL/util.hpp" // utility library
+#include <iomanip>
 
 // pick up device type from compiler command line or from the default type
 #ifndef DEVICE
@@ -17,8 +18,8 @@
 
 int main(int argc, char *argv[])
 {
-  const char *ifilename = argc > 1 ?           argv[1] : "../../goldhillin.ppm"; /*../../ghost-town-8k.ppm";*/
-  const char *ofilename = argc > 2 ?           argv[2] : "../../goldhillout.ppm";
+  const char *ifilename = argc > 1 ?           argv[1] : "../../goldhillin.ppm"; /*../../ghost-town-8kin.ppm";*/
+  const char *ofilename = argc > 2 ?           argv[2] : "../../goldhillout.ppm"; /*../../ghost-town-8kout.ppm";*/
   const int blur_radius = argc > 3 ? std::atoi(argv[3]) : 5;
 
   ppm img;
@@ -26,14 +27,12 @@ int main(int argc, char *argv[])
 
   cl::Buffer d_original_image, d_blurred_image, d_sharpened_image; // What do I allocate for sharpened image?
   // See if the logic for the kernels is right.
-  std::cout << "Reading from " << ifilename << std::endl;
+  std::cout << "Reading from " << ifilename << "\n" << std::endl;
   img.read(ifilename, h_original_image);
   // Allocate space for the blurred output image
   h_blurred_image.resize(img.w * img.h * img.nchannels);
   // Allocate space for the sharpened output image
   h_sharpened_image.resize(img.w * img.h * img.nchannels);
-
-  auto t1 = std::chrono::steady_clock::now();
 
   // Create a context
   cl::Context context(DEVICE);
@@ -43,11 +42,35 @@ int main(int argc, char *argv[])
   auto deviceList = context.getInfo<CL_CONTEXT_DEVICES>();
   //Create a program object for the context
   cl::Program program;
+
+  //////////////////////////////////////////////////////////////////////////////////////////////////////
+  ///////////////////////////////////// Serial Execution BEGIN /////////////////////////////////////////
+  //////////////////////////////////////////////////////////////////////////////////////////////////////
+  auto serialExecutionPreTimer = std::chrono::steady_clock::now();
+
+  unsharp_mask(h_sharpened_image.data(), h_original_image.data(), blur_radius,
+	  img.w, img.h, img.nchannels);
+
+  auto serialExecutionPostTimer = std::chrono::steady_clock::now();
+  std::cout 
+	  << "Serial execution ran in "
+	  << std::chrono::duration<double>(serialExecutionPostTimer - serialExecutionPreTimer).count() 
+	  << " seconds.\n"
+	  << std::endl;
+
+  //////////////////////////////////////////////////////////////////////////////////////////////////////
+  ////////////////////////////////////// Serial Execution END //////////////////////////////////////////
+  //////////////////////////////////////////////////////////////////////////////////////////////////////
+
+  // Placeholders for the Parallel Timers.
+  std::chrono::time_point<std::chrono::steady_clock> parallelPreTimer, parallelPostTimer;
   try
   {
 	  //////////////////////////////////////////////////////////////////////////////////////////////////////
 	  //////////////////////////////// Blur operation begins ///////////////////////////////////////////////
 	  //////////////////////////////////////////////////////////////////////////////////////////////////////
+
+	  parallelPreTimer = std::chrono::steady_clock::now(); // Timer before kernel execution begins
 
 	  // Load Kernel Source
 	  program = cl::Program(context, util::loadProgram("../../blur.cl"));
@@ -76,9 +99,7 @@ int main(int argc, char *argv[])
 	  blur.setArg(4, img.h);
 	  blur.setArg(5, img.nchannels);
 
-	  // Should I be using h_data_sharp in this kernel portion or h_data_out?
-
-	  util::Timer timer1;
+	  auto blurPreTimer = std::chrono::steady_clock::now(); // Timer before blur launch
 
 	  queue.enqueueNDRangeKernel(
 		  blur, 
@@ -87,9 +108,15 @@ int main(int argc, char *argv[])
 		  cl::NullRange, 
 		  NULL, 
 		  &event);
+	  auto blurPostTimer = std::chrono::steady_clock::now();  // Timer after blur finish
 
-	  double rtime1 = static_cast<double>(timer1.getTimeMilliseconds()) / 1000.0;
-	  printf("\nThe kernels ran in %lf seconds\n", rtime1);
+	  std::cout 
+		  << "Blur kernel ran in "
+		  << std::fixed
+		  << std::setprecision(7)
+		  << std::chrono::duration<double>(blurPostTimer - blurPreTimer).count() 
+		  << " seconds.\n"
+		  << std::endl;
 
 	  //////////////////////////////////////////////////////////////////////////////////////////////////////
 	  //////////////////////////////// Blur operation finished, now Add_Weighted ///////////////////////////
@@ -116,6 +143,8 @@ int main(int argc, char *argv[])
 	  add_weighted.setArg(7, img.h);
 	  add_weighted.setArg(8, img.nchannels);
 
+	  auto add_weightedPreTimer = std::chrono::steady_clock::now(); // Timer before add_weighted launch
+
 	  queue.enqueueNDRangeKernel(
 		  add_weighted,
 		  cl::NullRange,
@@ -124,19 +153,31 @@ int main(int argc, char *argv[])
 		  NULL,
 		  &event);
 
-	  util::Timer timer2;
+	  auto add_weightedPostTimer = std::chrono::steady_clock::now(); // Timer after add_weighted finish
+
+	  std::cout
+		  << "Add_Weighted kernel ran in "
+		  << std::fixed
+		  << std::setprecision(7)
+		  << std::chrono::duration<double>(add_weightedPostTimer - add_weightedPreTimer).count()
+		  << " seconds.\n"
+		  << std::endl;
 
 	 queue.finish();
 
-	  double rtime2 = static_cast<double>(timer2.getTimeMilliseconds()) / 1000.0;
-	  printf("\nThe kernels ran in %lf seconds\n", rtime2);
-
+	 parallelPostTimer = std::chrono::steady_clock::now(); // Timer after kernel execution is finished
+	 std::cout
+		 << "Parallel execution ran in "
+		 << std::chrono::duration<double>(parallelPostTimer - parallelPreTimer).count()
+		 << " seconds.\n"
+		 << std::endl;
 	  //////////////////////////////////////////////////////////////////////////////////////////////////////
 	  /////////////////// Add_Weighted finished, now copy back to host buffer for writing //////////////////
 	  //////////////////////////////////////////////////////////////////////////////////////////////////////
 
 	  // Copy the contents of d_sharpened_image to h_sharpened_image.
 	  cl::copy(queue, d_sharpened_image, h_sharpened_image.begin(), h_sharpened_image.end());
+	  // Does this need to be timed also or just the kernel execution?
 	  
 	  // Test the results
 	  int correct = 0;
@@ -171,14 +212,16 @@ int main(int argc, char *argv[])
 	  }
   }
 
-  auto t2 = std::chrono::steady_clock::now();
-  std::cout << std::chrono::duration<double>(t2-t1).count() << " seconds.\n";
-
   // Write the sharpened image - to become the new picture.
-  std::cout << "Writing final image to " << ofilename << std::endl;
+  std::cout << "Writing final image to " << ofilename << "\n" << std::endl;
 
   img.write(ofilename, h_sharpened_image);
-  
+
+  // Factor by which Parallel execution was faster than Serial execution.
+  float speedFactorDifference = serialExecutionPostTimer;
+  std::cout << "Parallel execution was " << speedFactorDifference << " Times faster than Serial execution" << std::endl;
+
+  system("pause");
   return 0;
 }
 
