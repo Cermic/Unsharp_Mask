@@ -5,9 +5,9 @@
 //template <typename T>
 	__kernel void add_weighted(
 	__global unsigned char *out,
-	__global const unsigned char *in1, 
+	/*__constant*/ __global const unsigned char *in1, 
 	const float alpha,
-	__global const unsigned char *in2,
+	/*__constant*/ __global const unsigned char *in2,
 	const float  beta, 
 	const float gamma,
 	const unsigned w, 

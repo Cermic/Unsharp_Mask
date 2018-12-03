@@ -13,10 +13,15 @@
 // Averages the nsamples pixels within blur_radius of (x,y). Pixels which
 // would be outside the image, replicate the value at the image border.
 
-void pixel_average(__global unsigned char *out,
-	__global const unsigned char *in,
-	const int x, const int y, const int blur_radius,
-	const unsigned w, const unsigned h, const unsigned nchannels)
+void pixel_average(
+	__global unsigned char *out,
+	/*__constant*/ __global const unsigned char *in,
+	const int x,
+	const int y,
+	const int blur_radius,
+	const unsigned w,
+	const unsigned h,
+	const unsigned nchannels)
 {
 	float red_total = 0, green_total = 0, blue_total = 0;
 
@@ -41,11 +46,11 @@ void pixel_average(__global unsigned char *out,
 
 __kernel void blur(
 	__global unsigned char* out,
-	__global const unsigned char* in,
-	/*__contant */ const int blur_radius,
-	 const unsigned w,
-	 const unsigned h,
-     const unsigned nchannels)
+	/*__constant*/ __global const unsigned char* in,
+	const int blur_radius,
+	const unsigned w,
+	const unsigned h,
+	const unsigned nchannels)
 {
 	//int z = get_global_size(0); // What is this value?
 	int x = get_global_id(0);

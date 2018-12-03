@@ -18,8 +18,8 @@
 
 int main(int argc, char *argv[])
 {
-  const char *ifilename = argc > 1 ?           argv[1] : "../../goldhillin.ppm"; /*../../ghost-town-8kin.ppm";*/
-  const char *ofilename = argc > 2 ?           argv[2] : "../../goldhillout.ppm"; /*../../ghost-town-8kout.ppm";*/
+  const char *ifilename = argc > 1 ? argv[1]			: /*"../../goldhillin.ppm";*/ "../../ghost-town-8kin.ppm"; 
+  const char *ofilename = argc > 2 ?           argv[2]  : /*"../../goldhillout.ppm";*/ "../../ghost-town-8kout.ppm";
   const int blur_radius = argc > 3 ? std::atoi(argv[3]) : 5;
 
   ppm img;
@@ -29,10 +29,16 @@ int main(int argc, char *argv[])
   // See if the logic for the kernels is right.
   std::cout << "Reading from " << ifilename << "\n" << std::endl;
   img.read(ifilename, h_original_image);
+
+  // Does any of this need timed?
+
+
   // Allocate space for the blurred output image
   h_blurred_image.resize(img.w * img.h * img.nchannels);
   // Allocate space for the sharpened output image
   h_sharpened_image.resize(img.w * img.h * img.nchannels);
+
+  // Time it?
 
   // Create a context
   cl::Context context(DEVICE);
@@ -63,14 +69,14 @@ int main(int argc, char *argv[])
   //////////////////////////////////////////////////////////////////////////////////////////////////////
 
   // Placeholders for the Parallel Timers.
-  std::chrono::time_point<std::chrono::steady_clock> parallelPreTimer, parallelPostTimer;
+  std::chrono::time_point<std::chrono::steady_clock> parallelExecutionPreTimer, parallelExecutionPostTimer;
   try
   {
 	  //////////////////////////////////////////////////////////////////////////////////////////////////////
 	  //////////////////////////////// Blur operation begins ///////////////////////////////////////////////
 	  //////////////////////////////////////////////////////////////////////////////////////////////////////
 
-	  parallelPreTimer = std::chrono::steady_clock::now(); // Timer before kernel execution begins
+	  parallelExecutionPreTimer = std::chrono::steady_clock::now(); // Timer before kernel execution begins
 
 	  // Load Kernel Source
 	  program = cl::Program(context, util::loadProgram("../../blur.cl"));
@@ -80,7 +86,6 @@ int main(int argc, char *argv[])
 	  cl::CommandQueue queue(context);
 
 	  // Create the kernel
-	  //cl::make_kernel<cl::Buffer, cl::Buffer, int, int, int, int> blur(program, "blur");
 	  cl::Kernel blur = cl::Kernel(program, "blur");
 	  
 	  //Assign buffers
@@ -132,6 +137,7 @@ int main(int argc, char *argv[])
 
 	  //Assign buffer
 	  d_sharpened_image = cl::Buffer(context, h_sharpened_image.begin(), h_sharpened_image.end(), CL_MEM_READ_WRITE, true);
+	  // Since this is empty space it could just be allocated as such instead of being copied here?
 
 	  add_weighted.setArg(0, d_sharpened_image);
 	  add_weighted.setArg(1, d_original_image);
@@ -164,19 +170,19 @@ int main(int argc, char *argv[])
 		  << std::endl;
 
 	 queue.finish();
-
-	 parallelPostTimer = std::chrono::steady_clock::now(); // Timer after kernel execution is finished
-	 std::cout
-		 << "Parallel execution ran in "
-		 << std::chrono::duration<double>(parallelPostTimer - parallelPreTimer).count()
-		 << " seconds.\n"
-		 << std::endl;
 	  //////////////////////////////////////////////////////////////////////////////////////////////////////
 	  /////////////////// Add_Weighted finished, now copy back to host buffer for writing //////////////////
 	  //////////////////////////////////////////////////////////////////////////////////////////////////////
 
 	  // Copy the contents of d_sharpened_image to h_sharpened_image.
 	  cl::copy(queue, d_sharpened_image, h_sharpened_image.begin(), h_sharpened_image.end());
+
+	  parallelExecutionPostTimer = std::chrono::steady_clock::now(); // Timer after kernel execution is finished
+	  std::cout
+		  << "Parallel execution ran in "
+		  << std::chrono::duration<double>(parallelExecutionPostTimer - parallelExecutionPreTimer).count()
+		  << " seconds.\n"
+		  << std::endl;
 	  // Does this need to be timed also or just the kernel execution?
 	  
 	  // Test the results
@@ -218,8 +224,9 @@ int main(int argc, char *argv[])
   img.write(ofilename, h_sharpened_image);
 
   // Factor by which Parallel execution was faster than Serial execution.
-  float speedFactorDifference = serialExecutionPostTimer;
-  std::cout << "Parallel execution was " << speedFactorDifference << " Times faster than Serial execution" << std::endl;
+  //double speedFactorDifference = std::chrono::duration<double>(serialExecutionPostTimer / parallelExecutionPostTimer).count();
+  //// How to do this without running into this problem? How do I grab the count values out of post of these to divide them?
+  //std::cout << "Parallel execution was " << speedFactorDifference << " Times faster than Serial execution" << std::endl;
 
   system("pause");
   return 0;
