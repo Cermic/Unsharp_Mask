@@ -18,27 +18,25 @@
 
 int main(int argc, char *argv[])
 {
-  const char *ifilename = argc > 1 ? argv[1]			: /*"../../goldhillin.ppm";*/ "../../ghost-town-8kin.ppm"; 
-  const char *ofilename = argc > 2 ?           argv[2]  : /*"../../goldhillout.ppm";*/ "../../ghost-town-8kout.ppm";
+  const char *ifilename = argc > 1 ?		   argv[1]  : "../../goldhillin.ppm"; /*"../../ghost-town-8kin.ppm"; */
+  const char *ofilename = argc > 2 ?           argv[2]  : "../../goldhillout.ppm"; /*"../../ghost-town-8kout.ppm";*/
   const int blur_radius = argc > 3 ? std::atoi(argv[3]) : 5;
 
   ppm img;
   std::vector<unsigned char> h_original_image, h_blurred_image, h_sharpened_image;
 
-  cl::Buffer d_original_image, d_blurred_image, d_sharpened_image; // What do I allocate for sharpened image?
-  // See if the logic for the kernels is right.
+  cl::Buffer d_original_image, d_blurred_image, d_sharpened_image; 
+ 
   std::cout << "Reading from " << ifilename << "\n" << std::endl;
   img.read(ifilename, h_original_image);
-
-  // Does any of this need timed?
-
+  std::cout << "Reading complete." << ofilename << "\n" << std::endl;
 
   // Allocate space for the blurred output image
   h_blurred_image.resize(img.w * img.h * img.nchannels);
   // Allocate space for the sharpened output image
   h_sharpened_image.resize(img.w * img.h * img.nchannels);
 
-  // Time it?
+  // Time allocation for host buffers?
 
   // Create a context
   cl::Context context(DEVICE);
@@ -58,9 +56,10 @@ int main(int argc, char *argv[])
 	  img.w, img.h, img.nchannels);
 
   auto serialExecutionPostTimer = std::chrono::steady_clock::now();
+  double serialExecutionResult = std::chrono::duration<double>(serialExecutionPostTimer - serialExecutionPreTimer).count();
   std::cout 
 	  << "Serial execution ran in "
-	  << std::chrono::duration<double>(serialExecutionPostTimer - serialExecutionPreTimer).count() 
+	  << serialExecutionResult
 	  << " seconds.\n"
 	  << std::endl;
 
@@ -70,6 +69,7 @@ int main(int argc, char *argv[])
 
   // Placeholders for the Parallel Timers.
   std::chrono::time_point<std::chrono::steady_clock> parallelExecutionPreTimer, parallelExecutionPostTimer;
+  double parallelExecutionResult;
   try
   {
 	  //////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -177,10 +177,11 @@ int main(int argc, char *argv[])
 	  // Copy the contents of d_sharpened_image to h_sharpened_image.
 	  cl::copy(queue, d_sharpened_image, h_sharpened_image.begin(), h_sharpened_image.end());
 
-	  parallelExecutionPostTimer = std::chrono::steady_clock::now(); // Timer after kernel execution is finished
+	  parallelExecutionPostTimer = std::chrono::steady_clock::now(); // Timer after parallel execution is finished
+	  parallelExecutionResult = std::chrono::duration<double>(parallelExecutionPostTimer - parallelExecutionPreTimer).count();
 	  std::cout
 		  << "Parallel execution ran in "
-		  << std::chrono::duration<double>(parallelExecutionPostTimer - parallelExecutionPreTimer).count()
+		  << parallelExecutionResult
 		  << " seconds.\n"
 		  << std::endl;
 	  // Does this need to be timed also or just the kernel execution?
@@ -218,15 +219,16 @@ int main(int argc, char *argv[])
 	  }
   }
 
+  // Factor by which Parallel execution was faster than Serial execution.
+  double speedFactorDifference = (serialExecutionResult /= parallelExecutionResult);
+  std::cout << "Parallel execution was " << speedFactorDifference << " Times faster than Serial execution \n" << std::endl;
+
   // Write the sharpened image - to become the new picture.
   std::cout << "Writing final image to " << ofilename << "\n" << std::endl;
 
   img.write(ofilename, h_sharpened_image);
 
-  // Factor by which Parallel execution was faster than Serial execution.
-  //double speedFactorDifference = std::chrono::duration<double>(serialExecutionPostTimer / parallelExecutionPostTimer).count();
-  //// How to do this without running into this problem? How do I grab the count values out of post of these to divide them?
-  //std::cout << "Parallel execution was " << speedFactorDifference << " Times faster than Serial execution" << std::endl;
+  std::cout << "Writing complete." << ofilename << "\n" << std::endl;
 
   system("pause");
   return 0;
