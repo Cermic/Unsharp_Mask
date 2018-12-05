@@ -18,12 +18,12 @@
 
 int main(int argc, char *argv[])
 {
-  const char *ifilename = argc > 1 ?		   argv[1]  : "../../goldhillin.ppm"; /*"../../ghost-town-8kin.ppm"; */
-  const char *ofilename = argc > 2 ?           argv[2]  : "../../goldhillout.ppm"; /*"../../ghost-town-8kout.ppm";*/
-  const int blur_radius = argc > 3 ? std::atoi(argv[3]) : 10;
+  const char *ifilename = argc > 1 ?		   argv[1]  : /*"../../goldhillin.ppm";*/ "../../ghost-town-8kin.ppm"; 
+  const char *ofilename = argc > 2 ?           argv[2]  : /*"../../goldhillout.ppm";*/ "../../ghost-town-8kout.ppm";
+  const int blur_radius = argc > 3 ? std::atoi(argv[3]) : 3;
 
   ppm img;
-  int testCaseSize = 10, testCaseIgnoreBuffer = 5;
+  int testCaseSize = 10, testCaseIgnoreBuffer = 1;
 
   std::vector<unsigned char> h_original_image, h_blurred_image, h_sharpened_image;
   cl::Buffer d_original_image, d_blurred_image, d_sharpened_image; 
@@ -89,15 +89,6 @@ int main(int argc, char *argv[])
 	  std::cout << "\n-------------------------\n";
  }
 
-  std::cout << "Reading from " << ifilename << "\n" << std::endl;
-  img.read(ifilename, h_original_image);
-  std::cout << "Reading complete from " << ifilename << ".\n" << std::endl;
-
-  // Allocate space for the blurred output image
-  h_blurred_image.resize(img.w * img.h * img.nchannels);
-  // Allocate space for the sharpened output image
-  h_sharpened_image.resize(img.w * img.h * img.nchannels);
-
   // Create a context
   cl::Context context(DEVICE);
 
@@ -111,9 +102,19 @@ int main(int argc, char *argv[])
   ///////////////////////////////////// Serial Execution BEGIN /////////////////////////////////////////
   //////////////////////////////////////////////////////////////////////////////////////////////////////
   double serialExecutionResult = 0, serialExecutionAverage = 0;
+
+  std::cout << "Reading from " << ifilename << "\n" << std::endl;
+  img.read(ifilename, h_original_image);
+  std::cout << "Reading complete from " << ifilename << ".\n" << std::endl;
+
   for (int i = 0; i < (testCaseSize + testCaseIgnoreBuffer); i++)
   {
 		  auto serialExecutionPreTimer = std::chrono::steady_clock::now();
+
+		  // Allocate space for the blurred output image
+		  h_blurred_image.resize(img.w * img.h * img.nchannels);
+		  // Allocate space for the sharpened output image
+		  h_sharpened_image.resize(img.w * img.h * img.nchannels);
 
 		  unsharp_mask(h_sharpened_image.data(), h_original_image.data(), blur_radius,
 			  img.w, img.h, img.nchannels);
