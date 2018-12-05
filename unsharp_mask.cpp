@@ -7,28 +7,21 @@
 #include "CL/util.hpp" // utility library
 #include <iomanip>
 
-// pick up device type from compiler command line or from the default type
-#ifndef DEVICE
-#define DEVICE CL_DEVICE_TYPE_GPU
-#endif
-
 // Apply an unsharp mask to the 24-bit PPM loaded from the file path of
 // the first input argument; then write the sharpened output to the file path
 // of the second argument. The third argument provides the blur radius.
 
 int main(int argc, char *argv[])
 {
-  const char *ifilename = argc > 1 ?		   argv[1]  : /*"../../goldhillin.ppm";*/ "../../ghost-town-8kin.ppm"; 
-  const char *ofilename = argc > 2 ?           argv[2]  : /*"../../goldhillout.ppm";*/ "../../ghost-town-8kout.ppm";
-  const int blur_radius = argc > 3 ? std::atoi(argv[3]) : 3;
+  const char *ifilename = argc > 1 ?		   argv[1]  : "../../goldhillin.ppm"; /*"../../ghost-town-8kin.ppm"; */
+  const char *ofilename = argc > 2 ?           argv[2]  : "../../goldhillout.ppm"; /*"../../ghost-town-8kout.ppm";*/
+  const int blur_radius = argc > 3 ? std::atoi(argv[3]) : 5;
 
   ppm img;
-  int testCaseSize = 10, testCaseIgnoreBuffer = 1;
+  int testCaseSize = 6, testCaseIgnoreBuffer = 1;
 
   std::vector<unsigned char> h_original_image, h_blurred_image, h_sharpened_image;
   cl::Buffer d_original_image, d_blurred_image, d_sharpened_image; 
-
-  // Time allocation for host buffers?
 
   // Discover number of platforms
   std::vector<cl::Platform> platforms;
@@ -44,7 +37,6 @@ int main(int argc, char *argv[])
 	  std::cout << "Platform: " << s << std::endl;
 
 	  plat->getInfo(CL_PLATFORM_VENDOR, &s);
-	  
 	  std::cout << "\tVendor:  " << s << std::endl;
 
 	  plat->getInfo(CL_PLATFORM_VERSION, &s);
@@ -83,14 +75,32 @@ int main(int argc, char *argv[])
 		  std::cout << "\x08)" << std::endl;
 
 		  std::cout << "\t-------------------------" << std::endl;
-
 	  }
 
 	  std::cout << "\n-------------------------\n";
  }
 
+  // Device Selection - Prefers GPUs
+  int deviceSelection;
+  // Defaults to CPU incase there are no GPUs.
+  deviceSelection = CL_DEVICE_TYPE_CPU;
+  for (std::vector<cl::Platform>::iterator plat = platforms.begin(); plat != platforms.end(); plat++)
+  {
+	  std::string s;
+	  plat->getInfo(CL_PLATFORM_VENDOR, &s);
+	  if (s == "NVIDIA Corporation")
+	  {
+		  deviceSelection = CL_DEVICE_TYPE_GPU;
+		  break;
+	  }
+	  else if(s == "Advanced Micro Devices, Inc.")
+	  {
+		  deviceSelection = CL_DEVICE_TYPE_GPU;
+	  }
+  }
+
   // Create a context
-  cl::Context context(DEVICE);
+  cl::Context context(deviceSelection);
 
   //Create cl Event
   cl::Event event;
@@ -109,12 +119,14 @@ int main(int argc, char *argv[])
 
   for (int i = 0; i < (testCaseSize + testCaseIgnoreBuffer); i++)
   {
-		  auto serialExecutionPreTimer = std::chrono::steady_clock::now();
+		 // auto serialExecutionPreTimer = std::chrono::steady_clock::now();
 
 		  // Allocate space for the blurred output image
 		  h_blurred_image.resize(img.w * img.h * img.nchannels);
 		  // Allocate space for the sharpened output image
 		  h_sharpened_image.resize(img.w * img.h * img.nchannels);
+
+		  auto serialExecutionPreTimer = std::chrono::steady_clock::now();
 
 		  unsharp_mask(h_sharpened_image.data(), h_original_image.data(), blur_radius,
 			  img.w, img.h, img.nchannels);
@@ -147,6 +159,28 @@ int main(int argc, char *argv[])
   double parallelExecutionResult = 0, parallelExecutionAverage =0;
   try
   {
+	  // Get the command queue
+	  cl::CommandQueue queue(context);
+
+	  // Load Kernel Source
+	  program = cl::Program(context, util::loadProgram("../../blur.cl"));
+	  // Build the cl file to check for errors.
+	  program.build(context.getInfo<CL_CONTEXT_DEVICES>());
+	  // Create the kernel
+	  cl::Kernel blur = cl::Kernel(program, "blur");
+
+	  // Create Add_Weighted Kernel
+	  program = cl::Program(context, util::loadProgram("../../add_weighted.cl"));
+	  // Build the cl file to check for errors.
+	  program.build(context.getInfo<CL_CONTEXT_DEVICES>());
+	  float alpha = 1.5f; float beta = -0.5f; float gamma = 0.0f;
+
+	  // Create the kernel 
+	  cl::Kernel add_weighted = cl::Kernel(program, "add_weighted");
+
+	 /* auto workGroupSize = add_weighted.getWorkGroupInfo<CL_KERNEL_WORK_GROUP_SIZE>();
+	  auto numWorkGroups = h_original_image.size() / workGroupSize;*/
+
 	  for (int i = 0; i < (testCaseSize + testCaseIgnoreBuffer); i++)
 	  {
 			  //////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -154,16 +188,6 @@ int main(int argc, char *argv[])
 			  //////////////////////////////////////////////////////////////////////////////////////////////////////
 
 			  parallelExecutionPreTimer = std::chrono::steady_clock::now(); // Timer before kernel execution begins
-
-			  // Load Kernel Source
-			  program = cl::Program(context, util::loadProgram("../../blur.cl"));
-			  // Build the cl file to check for errors.
-			  program.build(context.getInfo<CL_CONTEXT_DEVICES>());
-			  // Get the command queue
-			  cl::CommandQueue queue(context);
-
-			  // Create the kernel
-			  cl::Kernel blur = cl::Kernel(program, "blur");
 
 			  //Assign buffers
 			  d_original_image = cl::Buffer(context, h_original_image.begin(), h_original_image.end(), CL_MEM_READ_WRITE, true);
@@ -189,16 +213,10 @@ int main(int argc, char *argv[])
 			  //////////////////////////////// Blur operation finished, now Add_Weighted ///////////////////////////
 			  //////////////////////////////////////////////////////////////////////////////////////////////////////
 
-			  program = cl::Program(context, util::loadProgram("../../add_weighted.cl"));
-			  // Build the cl file to check for errors.
-			  program.build(context.getInfo<CL_CONTEXT_DEVICES>());
-			  float alpha = 1.5f; float beta = -0.5f; float gamma = 0.0f;
-
-			  // Create the kernel 
-			  cl::Kernel add_weighted = cl::Kernel(program, "add_weighted");
-
 			  //Assign buffer
 			  d_sharpened_image = cl::Buffer(context, h_sharpened_image.begin(), h_sharpened_image.end(), CL_MEM_READ_WRITE, true);
+
+			 // d_sharpened_image = cl::Buffer(context, sizeof(insigned char) * numWorkGroups, CL_MEM_READ_WRITE, true);
 			  // Since this is empty space it could just be allocated as such instead of being copied here?
 
 			  add_weighted.setArg(0, d_sharpened_image);
@@ -210,15 +228,17 @@ int main(int argc, char *argv[])
 			  add_weighted.setArg(6, img.w);
 			  add_weighted.setArg(7, img.h);
 			  add_weighted.setArg(8, img.nchannels);
+			  //add_weighted.setArg(9, sizeof(unsigned char) * workGroupSize, nullptr);
+			  //add_weighted.setArg(10, sizeof(unsigned char) * workGroupSize, nullptr);
 
 			  queue.enqueueNDRangeKernel(
 				  add_weighted,
 				  cl::NullRange,
 				  cl::NDRange(img.w, img.h),
-				  cl::NullRange,
+				  cl::NullRange /* cl::NDRange(workGroupSize)*/,
 				  NULL,
 				  &event);
-
+			   // Work group size must be a multiple of the global NDRange
 			  queue.finish();
 			  //////////////////////////////////////////////////////////////////////////////////////////////////////
 			  /////////////////// Add_Weighted finished, now copy back to host buffer for writing //////////////////
