@@ -178,8 +178,8 @@ int main(int argc, char *argv[])
 	  // Create the kernel 
 	  cl::Kernel add_weighted = cl::Kernel(program, "add_weighted");
 
-	 /* auto workGroupSize = add_weighted.getWorkGroupInfo<CL_KERNEL_WORK_GROUP_SIZE>();
-	  auto numWorkGroups = h_original_image.size() / workGroupSize;*/
+	  auto workGroupSize = add_weighted.getWorkGroupInfo<CL_KERNEL_WORK_GROUP_SIZE>(cl::Device::getDefault());
+	  auto numWorkGroups = h_original_image.size() / workGroupSize;
 
 	  for (int i = 0; i < (testCaseSize + testCaseIgnoreBuffer); i++)
 	  {
