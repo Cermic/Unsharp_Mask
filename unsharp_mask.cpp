@@ -13,9 +13,9 @@
 
 int main(int argc, char *argv[])
 {
-  const char *ifilename = argc > 1 ?		   argv[1]  : "../../goldhillin.ppm"; /*"../../ghost-town-8kin.ppm"; */
+  const char *ifilename = argc > 1 ?		   argv[1]  : "../../goldhillin.ppm";/* "../../ghost-town-8kin.ppm";*/ 
   const char *ofilename = argc > 2 ?           argv[2]  : "../../goldhillout.ppm"; /*"../../ghost-town-8kout.ppm";*/
-  const int blur_radius = argc > 3 ? std::atoi(argv[3]) : 5;
+  const int blur_radius = argc > 3 ? std::atoi(argv[3]) : 3;
 
   ppm img;
   int testCaseSize = 6, testCaseIgnoreBuffer = 1;
@@ -178,8 +178,8 @@ int main(int argc, char *argv[])
 	  // Create the kernel 
 	  cl::Kernel add_weighted = cl::Kernel(program, "add_weighted");
 
-	  auto workGroupSize = add_weighted.getWorkGroupInfo<CL_KERNEL_WORK_GROUP_SIZE>(cl::Device::getDefault());
-	  auto numWorkGroups = h_original_image.size() / workGroupSize;
+	  //auto workGroupSize = add_weighted.getWorkGroupInfo<CL_KERNEL_WORK_GROUP_SIZE>(cl::Device::getDefault());
+	  //auto numWorkGroups = h_original_image.size() / workGroupSize;
 
 	  for (int i = 0; i < (testCaseSize + testCaseIgnoreBuffer); i++)
 	  {
@@ -187,11 +187,19 @@ int main(int argc, char *argv[])
 			  //////////////////////////////// Blur operation begins ///////////////////////////////////////////////
 			  //////////////////////////////////////////////////////////////////////////////////////////////////////
 
-			  parallelExecutionPreTimer = std::chrono::steady_clock::now(); // Timer before kernel execution begins
+			  //parallelExecutionPreTimer = std::chrono::steady_clock::now(); // Timer before kernel execution begins
 
 			  //Assign buffers
 			  d_original_image = cl::Buffer(context, h_original_image.begin(), h_original_image.end(), CL_MEM_READ_WRITE, true);
 			  d_blurred_image = cl::Buffer(context, h_blurred_image.begin(), h_blurred_image.end(), CL_MEM_READ_WRITE, true);
+
+			  //Assign buffer
+			  d_sharpened_image = cl::Buffer(context, h_sharpened_image.begin(), h_sharpened_image.end(), CL_MEM_READ_WRITE, true);
+
+			  // d_sharpened_image = cl::Buffer(context, sizeof(insigned char) * numWorkGroups, CL_MEM_READ_WRITE, true);
+			   // Since this is empty space it could just be allocated as such instead of being copied here?
+
+			  parallelExecutionPreTimer = std::chrono::steady_clock::now(); // Timer before kernel execution begins
 
 			  // Set Kernel Arguments
 			  blur.setArg(0, d_blurred_image);
@@ -212,12 +220,6 @@ int main(int argc, char *argv[])
 			  //////////////////////////////////////////////////////////////////////////////////////////////////////
 			  //////////////////////////////// Blur operation finished, now Add_Weighted ///////////////////////////
 			  //////////////////////////////////////////////////////////////////////////////////////////////////////
-
-			  //Assign buffer
-			  d_sharpened_image = cl::Buffer(context, h_sharpened_image.begin(), h_sharpened_image.end(), CL_MEM_READ_WRITE, true);
-
-			 // d_sharpened_image = cl::Buffer(context, sizeof(insigned char) * numWorkGroups, CL_MEM_READ_WRITE, true);
-			  // Since this is empty space it could just be allocated as such instead of being copied here?
 
 			  add_weighted.setArg(0, d_sharpened_image);
 			  add_weighted.setArg(1, d_original_image);
