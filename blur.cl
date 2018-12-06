@@ -73,5 +73,6 @@ __kernel void blur(
 	//int z = get_global_size(0); // What is this value?
 	int x = get_global_id(0);
 	int y = get_global_id(1);
+	//barrier(CLK_GLOBAL_MEM_FENCE);
 		pixel_average(out, in, x, y, blur_radius, w, h, nchannels);
 }
