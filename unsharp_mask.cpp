@@ -13,15 +13,24 @@
 
 int main(int argc, char *argv[])
 {
-  const char *ifilename = argc > 1 ?		   argv[1]  : "../../goldhillin.ppm";/* "../../ghost-town-8kin.ppm";*/ 
-  const char *ofilename = argc > 2 ?           argv[2]  : "../../goldhillout.ppm"; /*"../../ghost-town-8kout.ppm";*/
-  const int blur_radius = argc > 3 ? std::atoi(argv[3]) : 3;
+		const char *ifilename = argc > 1 ? argv[1] : "../../goldhillin.ppm";     /*"../../ghost-town-8kin.ppm"; */   /* "../../gothicin.ppm";*/
+		const char *ofilename = argc > 2 ? argv[2] : "../../goldhillout.ppm";   /*"../../ghost-town-8kout.ppm";*/    /*"../../gothicout.ppm";*/
+		const int blur_radius = argc > 3 ? std::atoi(argv[3]) : 5;
 
   ppm img;
-  int testCaseSize = 6, testCaseIgnoreBuffer = 1;
+  int testCaseSize = 6, testCaseIgnoreBuffer = 2;
 
-  std::vector<unsigned char> h_original_image, h_blurred_image, h_sharpened_image;
-  cl::Buffer d_original_image, d_blurred_image, d_sharpened_image; 
+  struct Buffers 
+  {
+	  std::vector<unsigned char> h_original_image, h_blurred_image, h_sharpened_image;
+
+	  cl::Buffer d_original_image, d_blurred_image, d_sharpened_image;
+  }buffers;
+  
+  struct ImageValues
+  {
+	  float alpha = 1.5f, beta = -0.5f, gamma = 0.0f;
+  } val;
 
   // Discover number of platforms
   std::vector<cl::Platform> platforms;
@@ -97,6 +106,8 @@ int main(int argc, char *argv[])
 	  {
 		  deviceSelection = CL_DEVICE_TYPE_GPU;
 	  }
+
+	  //device->getInfo(CL_DEVICE_TYPE, &s);
   }
 
   // Create a context
@@ -114,31 +125,33 @@ int main(int argc, char *argv[])
   double serialExecutionResult = 0, serialExecutionAverage = 0;
 
   std::cout << "Reading from " << ifilename << "\n" << std::endl;
-  img.read(ifilename, h_original_image);
-  std::cout << "Reading complete from " << ifilename << ".\n" << std::endl;
+  img.read(ifilename, buffers.h_original_image);
+  std::cout << "Reading complete from " << ifilename << " Serial execution will now begin.\n" << std::endl;
+
+  // Allocate space for the blurred output image
+  buffers.h_blurred_image.resize(img.w * img.h * img.nchannels);
+  // Allocate space for the sharpened output image
+  buffers.h_sharpened_image.resize(img.w * img.h * img.nchannels);
+
+  std::cout << "Serial process is being cycled to filter out erroneous values, please be patient... \n"<< std::endl;
 
   for (int i = 0; i < (testCaseSize + testCaseIgnoreBuffer); i++)
   {
-		 // auto serialExecutionPreTimer = std::chrono::steady_clock::now();
-
-		  // Allocate space for the blurred output image
-		  h_blurred_image.resize(img.w * img.h * img.nchannels);
-		  // Allocate space for the sharpened output image
-		  h_sharpened_image.resize(img.w * img.h * img.nchannels);
-
 		  auto serialExecutionPreTimer = std::chrono::steady_clock::now();
 
-		  unsharp_mask(h_sharpened_image.data(), h_original_image.data(), blur_radius,
+		  unsharp_mask(buffers.h_sharpened_image.data(), buffers.h_original_image.data(), blur_radius,
 			  img.w, img.h, img.nchannels);
 
 		  auto serialExecutionPostTimer = std::chrono::steady_clock::now();
-		  serialExecutionResult = std::chrono::duration<double>(serialExecutionPostTimer - serialExecutionPreTimer).count();
+		  serialExecutionResult = std::chrono::duration<double, std::ratio<1, 1000>>(serialExecutionPostTimer - serialExecutionPreTimer).count();
 		  if (i >= testCaseIgnoreBuffer)
 		  {
 		  std::cout
 			  << "Serial execution ran in "
+			  << std::fixed
+			  << std::setprecision(1)
 			  << serialExecutionResult
-			  << " seconds."
+			  << " milliseconds."
 			  << std::endl;
 		  serialExecutionAverage += serialExecutionResult;
 		 }
@@ -147,12 +160,19 @@ int main(int argc, char *argv[])
 	  << "Serial execution average time after "
 	  << testCaseSize
 	  << " Iterations was "
-	  << (serialExecutionAverage / testCaseSize)
-	  << " seconds.\n"
+	  << std::fixed
+	  << std::setprecision(1)
+	  << (serialExecutionAverage /= testCaseSize)
+	  << " milliseconds.\n"
 	  << std::endl;
   //////////////////////////////////////////////////////////////////////////////////////////////////////
   ////////////////////////////////////// Serial Execution END //////////////////////////////////////////
   //////////////////////////////////////////////////////////////////////////////////////////////////////
+
+   //////////////////////////////////////////////////////////////////////////////////////////////////////
+  ////////////////////////////////////// Paralllel Execution BEGIN //////////////////////////////////////
+  //////////////////////////////////////////////////////////////////////////////////////////////////////
+
 
   // Placeholders for the Parallel Timers.
   std::chrono::time_point<std::chrono::steady_clock> parallelExecutionPreTimer, parallelExecutionPostTimer;
@@ -173,7 +193,6 @@ int main(int argc, char *argv[])
 	  program = cl::Program(context, util::loadProgram("../../add_weighted.cl"));
 	  // Build the cl file to check for errors.
 	  program.build(context.getInfo<CL_CONTEXT_DEVICES>());
-	  float alpha = 1.5f; float beta = -0.5f; float gamma = 0.0f;
 
 	  // Create the kernel 
 	  cl::Kernel add_weighted = cl::Kernel(program, "add_weighted");
@@ -181,82 +200,113 @@ int main(int argc, char *argv[])
 	  //auto workGroupSize = add_weighted.getWorkGroupInfo<CL_KERNEL_WORK_GROUP_SIZE>(cl::Device::getDefault());
 	  //auto numWorkGroups = h_original_image.size() / workGroupSize;
 
+	  std::cout << "Parallel process is being cycled to filter out erroneous values, please be patient... \n" << std::endl;
+
 	  for (int i = 0; i < (testCaseSize + testCaseIgnoreBuffer); i++)
 	  {
 			  //////////////////////////////////////////////////////////////////////////////////////////////////////
 			  //////////////////////////////// Blur operation begins ///////////////////////////////////////////////
 			  //////////////////////////////////////////////////////////////////////////////////////////////////////
 
-			  //parallelExecutionPreTimer = std::chrono::steady_clock::now(); // Timer before kernel execution begins
+			  parallelExecutionPreTimer = std::chrono::steady_clock::now(); // Timer before kernel execution begins
+
+			  auto bufferAssignmentPreTimer = std::chrono::steady_clock::now();
 
 			  //Assign buffers
-			  d_original_image = cl::Buffer(context, h_original_image.begin(), h_original_image.end(), CL_MEM_READ_WRITE, true);
-			  d_blurred_image = cl::Buffer(context, h_blurred_image.begin(), h_blurred_image.end(), CL_MEM_READ_WRITE, true);
+			  buffers.d_original_image = cl::Buffer(context, buffers.h_original_image.begin(), buffers.h_original_image.end(), CL_MEM_READ_ONLY, true);
+			  buffers.d_blurred_image = cl::Buffer(context, buffers.h_blurred_image.begin(), buffers.h_blurred_image.end(), CL_MEM_READ_ONLY, true);
 
 			  //Assign buffer
-			  d_sharpened_image = cl::Buffer(context, h_sharpened_image.begin(), h_sharpened_image.end(), CL_MEM_READ_WRITE, true);
+			  buffers.d_sharpened_image = cl::Buffer(context, buffers.h_sharpened_image.begin(), buffers.h_sharpened_image.end(), CL_MEM_READ_ONLY, true);
+
+			  auto bufferAssignmentPostTimer = std::chrono::steady_clock::now();
 
 			  // d_sharpened_image = cl::Buffer(context, sizeof(insigned char) * numWorkGroups, CL_MEM_READ_WRITE, true);
 			   // Since this is empty space it could just be allocated as such instead of being copied here?
 
-			  parallelExecutionPreTimer = std::chrono::steady_clock::now(); // Timer before kernel execution begins
-
+			  auto blurKernelPreTimer = std::chrono::steady_clock::now();
 			  // Set Kernel Arguments
-			  blur.setArg(0, d_blurred_image);
-			  blur.setArg(1, d_original_image);
+			  blur.setArg(0, buffers.d_blurred_image);
+			  blur.setArg(1, buffers.d_original_image);
 			  blur.setArg(2, blur_radius);
 			  blur.setArg(3, img.w);
 			  blur.setArg(4, img.h);
 			  blur.setArg(5, img.nchannels);
+			  //add_weighted.setArg(9, sizeof(unsigned char) * workGroupSize, nullptr);
+			  //add_weighted.setArg(10, sizeof(unsigned char) * workGroupSize, nullptr);
 
 			  queue.enqueueNDRangeKernel(
 				  blur,
 				  cl::NullRange,
 				  cl::NDRange(img.w, img.h),
-				  cl::NullRange,
+				  cl::NullRange /* cl::NDRange(workGroupSize)*/,
 				  NULL,
 				  &event);
 
+			  auto blurKernelPostTimer = std::chrono::steady_clock::now();
 			  //////////////////////////////////////////////////////////////////////////////////////////////////////
 			  //////////////////////////////// Blur operation finished, now Add_Weighted ///////////////////////////
 			  //////////////////////////////////////////////////////////////////////////////////////////////////////
+			  auto add_WeightedKernelPreTimer = std::chrono::steady_clock::now();
 
-			  add_weighted.setArg(0, d_sharpened_image);
-			  add_weighted.setArg(1, d_original_image);
-			  add_weighted.setArg(2, alpha);
-			  add_weighted.setArg(3, d_blurred_image);
-			  add_weighted.setArg(4, beta);
-			  add_weighted.setArg(5, gamma);
+			  add_weighted.setArg(0, buffers.d_sharpened_image);
+			  add_weighted.setArg(1, buffers.d_original_image);
+			  add_weighted.setArg(2, val.alpha);
+			  add_weighted.setArg(3, buffers.d_blurred_image);
+			  add_weighted.setArg(4, val.beta);
+			  add_weighted.setArg(5, val.gamma);
 			  add_weighted.setArg(6, img.w);
 			  add_weighted.setArg(7, img.h);
 			  add_weighted.setArg(8, img.nchannels);
-			  //add_weighted.setArg(9, sizeof(unsigned char) * workGroupSize, nullptr);
-			  //add_weighted.setArg(10, sizeof(unsigned char) * workGroupSize, nullptr);
 
 			  queue.enqueueNDRangeKernel(
 				  add_weighted,
 				  cl::NullRange,
 				  cl::NDRange(img.w, img.h),
-				  cl::NullRange /* cl::NDRange(workGroupSize)*/,
+				  cl::NullRange,
 				  NULL,
 				  &event);
-			   // Work group size must be a multiple of the global NDRange
+
+			  auto add_WeightedKernelPostTimer = std::chrono::steady_clock::now();
+
 			  queue.finish();
 			  //////////////////////////////////////////////////////////////////////////////////////////////////////
 			  /////////////////// Add_Weighted finished, now copy back to host buffer for writing //////////////////
 			  //////////////////////////////////////////////////////////////////////////////////////////////////////
 
 			  // Copy the contents of d_sharpened_image to h_sharpened_image.
-			  cl::copy(queue, d_sharpened_image, h_sharpened_image.begin(), h_sharpened_image.end());
+			  auto copyToHostPreTimer = std::chrono::steady_clock::now();
+			  cl::copy(queue, buffers.d_sharpened_image, buffers.h_sharpened_image.begin(), buffers.h_sharpened_image.end());
+			  auto copyToHostPostTimer = std::chrono::steady_clock::now();
 
 			  parallelExecutionPostTimer = std::chrono::steady_clock::now(); // Timer after parallel execution is finished
 			  if (i >= testCaseIgnoreBuffer)
 			  {
-			  parallelExecutionResult = std::chrono::duration<double>(parallelExecutionPostTimer - parallelExecutionPreTimer).count();
+			  parallelExecutionResult = std::chrono::duration<double, std::ratio<1, 1000>>(parallelExecutionPostTimer - parallelExecutionPreTimer).count();
 			  std::cout
-				  << "Parallel execution ran in "
+				  << "Total parallel execution ran in "
+				  << std::fixed
+				  << std::setprecision(1)
 				  << parallelExecutionResult
-				  << " seconds."
+				  << " milliseconds.\n"
+				  << "Buffer assignment took "
+				  << std::fixed
+				  << std::setprecision(1)
+				  << std::chrono::duration<double,std::ratio<1,1000>>(bufferAssignmentPostTimer - bufferAssignmentPreTimer).count()
+				  << " milliseconds.\n"
+				  << "Blur kernel took "
+				  << std::fixed
+				  << std::setprecision(1)
+				  << std::chrono::duration<double, std::ratio<1, 1000>>(blurKernelPostTimer - blurKernelPreTimer).count()
+				  << " milliseconds.\n"
+				  << "Add_Weighted kernel took "
+				  << std::fixed
+				  << std::setprecision(1)
+				  << std::chrono::duration<double, std::ratio<1, 1000>>(add_WeightedKernelPostTimer - add_WeightedKernelPreTimer).count()
+				  << " milliseconds.\n"
+				  << "Copying back to host took "
+				  << std::chrono::duration<double, std::ratio<1, 1000>>(copyToHostPostTimer - copyToHostPreTimer).count()
+				  << " milliseconds.\n"
 				  << std::endl;
 			  parallelExecutionAverage += parallelExecutionResult;
 
@@ -268,8 +318,10 @@ int main(int argc, char *argv[])
 		  << "Parallel execution average time after "
 		  << testCaseSize
 		  << " Iterations was "
-		  << (parallelExecutionAverage / testCaseSize)
-		  << " seconds.\n"
+		  << std::fixed
+		  << std::setprecision(1)
+		  << (parallelExecutionAverage /= testCaseSize)
+		  << " milliseconds.\n"
 		  << std::endl;
 	}
   catch (cl::Error err ) {
@@ -304,12 +356,21 @@ int main(int argc, char *argv[])
 
   // Factor by which Parallel execution was faster than Serial execution.
   double speedFactorDifference = (serialExecutionAverage /= parallelExecutionAverage);
-  std::cout << "Parallel execution was " << speedFactorDifference << " Times faster than Serial execution \n" << std::endl;
+  std::cout
+	  << "Parallel execution was "
+	  << std::fixed
+	  << std::setprecision(1)
+	  << speedFactorDifference 
+	  << " Times faster than Serial execution \n" << std::endl;
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////// Paralllel Execution END ////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////////
 
   // Write the sharpened image - to become the new picture.
   std::cout << "Writing final image to " << ofilename << "\n" << std::endl;
 
-  img.write(ofilename, h_sharpened_image);
+  img.write(ofilename, buffers.h_sharpened_image);
 
   std::cout << "Writing complete." << ofilename << "\n" << std::endl;
 
