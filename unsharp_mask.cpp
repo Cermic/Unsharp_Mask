@@ -13,8 +13,8 @@
 
 int main(int argc, char *argv[])
 {
-		const char *ifilename = argc > 1 ? argv[1] : "../../goldhillin.ppm";     /*"../../ghost-town-8kin.ppm"; */   /* "../../gothicin.ppm";*/
-		const char *ofilename = argc > 2 ? argv[2] : "../../goldhillout.ppm";   /*"../../ghost-town-8kout.ppm";*/    /*"../../gothicout.ppm";*/
+		const char *ifilename = argc > 1 ? argv[1] : /*"../../goldhillin.ppm";*/     "../../ghost-town-8kin.ppm";    /* "../../gothicin.ppm";*//*"../../WhiteStreetIn.ppm";*/
+		const char *ofilename = argc > 2 ? argv[2] : /*"../../goldhillout.ppm";*/   "../../ghost-town-8kout.ppm";    /*"../../gothicout.ppm";*/ /*"../../WhiteStreetOut.ppm";*/
 		const int blur_radius = argc > 3 ? std::atoi(argv[3]) : 5;
 
   ppm img;
@@ -23,14 +23,14 @@ int main(int argc, char *argv[])
   struct Buffers 
   {
 	  std::vector<unsigned char> h_original_image, h_blurred_image, h_sharpened_image;
-
-	  cl::Buffer d_original_image, d_blurred_image, d_sharpened_image;
+	  cl::Buffer d_original_image, /*d_blurred_image,*/ d_sharpened_image;
+	  cl::Buffer d_blurred_image1, d_blurred_image2, d_blurred_image3;
   }buffers;
   
   struct ImageValues
   {
 	  float alpha = 1.5f, beta = -0.5f, gamma = 0.0f;
-  } val;
+  } imgval;
 
   // Discover number of platforms
   std::vector<cl::Platform> platforms;
@@ -63,7 +63,7 @@ int main(int argc, char *argv[])
 
 		  dev->getInfo(CL_DEVICE_NAME, &s);
 		  std::cout << "\t\tName: " << s << std::endl;
-
+		 
 		  dev->getInfo(CL_DEVICE_OPENCL_C_VERSION, &s);
 		  std::cout << "\t\tVersion: " << s << std::endl;
 
@@ -90,8 +90,8 @@ int main(int argc, char *argv[])
  }
 
   // Device Selection - Prefers GPUs
-  int deviceSelection;
-  // Defaults to CPU incase there are no GPUs.
+  int deviceSelection; 
+  // Defaults to CPU in case there are no GPUs.
   deviceSelection = CL_DEVICE_TYPE_CPU;
   for (std::vector<cl::Platform>::iterator plat = platforms.begin(); plat != platforms.end(); plat++)
   {
@@ -100,14 +100,17 @@ int main(int argc, char *argv[])
 	  if (s == "NVIDIA Corporation")
 	  {
 		  deviceSelection = CL_DEVICE_TYPE_GPU;
+		 // useHostPointer = true;
 		  break;
 	  }
 	  else if(s == "Advanced Micro Devices, Inc.")
 	  {
 		  deviceSelection = CL_DEVICE_TYPE_GPU;
+		 // useHostPointer = true;
 	  }
 
-	  //device->getInfo(CL_DEVICE_TYPE, &s);
+	 //device->getInfo(CL_DEVICE_TYPE, &s);
+	 // dev->getInfo(CL_DEVICE_VENDOR, &s);
   }
 
   // Create a context
@@ -119,21 +122,22 @@ int main(int argc, char *argv[])
   //Create a program object for the context
   cl::Program program;
 
-  //////////////////////////////////////////////////////////////////////////////////////////////////////
-  ///////////////////////////////////// Serial Execution BEGIN /////////////////////////////////////////
-  //////////////////////////////////////////////////////////////////////////////////////////////////////
-  double serialExecutionResult = 0, serialExecutionAverage = 0;
-
   std::cout << "Reading from " << ifilename << "\n" << std::endl;
   img.read(ifilename, buffers.h_original_image);
-  std::cout << "Reading complete from " << ifilename << " Serial execution will now begin.\n" << std::endl;
 
   // Allocate space for the blurred output image
   buffers.h_blurred_image.resize(img.w * img.h * img.nchannels);
   // Allocate space for the sharpened output image
   buffers.h_sharpened_image.resize(img.w * img.h * img.nchannels);
 
-  std::cout << "Serial process is being cycled to filter out erroneous values, please be patient... \n"<< std::endl;
+  std::cout << "Reading complete from " << ifilename << " Serial execution will now begin.\n" << std::endl;
+
+  //////////////////////////////////////////////////////////////////////////////////////////////////////
+  ///////////////////////////////////// Serial Execution BEGIN /////////////////////////////////////////
+  //////////////////////////////////////////////////////////////////////////////////////////////////////
+  double serialExecutionResult = 0, serialExecutionAverage = 0;
+
+  /*std::cout << "Serial process is being cycled to filter out erroneous values, please be patient... \n"<< std::endl;
 
   for (int i = 0; i < (testCaseSize + testCaseIgnoreBuffer); i++)
   {
@@ -164,7 +168,7 @@ int main(int argc, char *argv[])
 	  << std::setprecision(1)
 	  << (serialExecutionAverage /= testCaseSize)
 	  << " milliseconds.\n"
-	  << std::endl;
+	  << std::endl;*/
   //////////////////////////////////////////////////////////////////////////////////////////////////////
   ////////////////////////////////////// Serial Execution END //////////////////////////////////////////
   //////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -214,10 +218,10 @@ int main(int argc, char *argv[])
 
 			  //Assign buffers
 			  buffers.d_original_image = cl::Buffer(context, buffers.h_original_image.begin(), buffers.h_original_image.end(), CL_MEM_READ_ONLY, true);
-			  buffers.d_blurred_image = cl::Buffer(context, buffers.h_blurred_image.begin(), buffers.h_blurred_image.end(), CL_MEM_READ_ONLY, true);
+			  buffers.d_blurred_image1 = cl::Buffer(context, buffers.h_blurred_image.begin(), buffers.h_blurred_image.end(), CL_MEM_READ_WRITE, true);
 
 			  //Assign buffer
-			  buffers.d_sharpened_image = cl::Buffer(context, buffers.h_sharpened_image.begin(), buffers.h_sharpened_image.end(), CL_MEM_READ_ONLY, true);
+			  buffers.d_sharpened_image = cl::Buffer(context, buffers.h_sharpened_image.begin(), buffers.h_sharpened_image.end(), CL_MEM_READ_WRITE, true);
 
 			  auto bufferAssignmentPostTimer = std::chrono::steady_clock::now();
 
@@ -226,7 +230,7 @@ int main(int argc, char *argv[])
 
 			  auto blurKernelPreTimer = std::chrono::steady_clock::now();
 			  // Set Kernel Arguments
-			  blur.setArg(0, buffers.d_blurred_image);
+			  blur.setArg(0, buffers.d_blurred_image1);
 			  blur.setArg(1, buffers.d_original_image);
 			  blur.setArg(2, blur_radius);
 			  blur.setArg(3, img.w);
@@ -234,7 +238,43 @@ int main(int argc, char *argv[])
 			  blur.setArg(5, img.nchannels);
 			  //add_weighted.setArg(9, sizeof(unsigned char) * workGroupSize, nullptr);
 			  //add_weighted.setArg(10, sizeof(unsigned char) * workGroupSize, nullptr);
+			  // Execute Kernel
+			  queue.enqueueNDRangeKernel(
+				  blur,
+				  cl::NullRange,
+				  cl::NDRange(img.w, img.h),
+				  cl::NullRange /* cl::NDRange(workGroupSize)*/,
+				  NULL,
+				  &event);
 
+			  // Set Kernel Arguments
+			  blur.setArg(0, buffers.d_blurred_image2);
+			  blur.setArg(1, buffers.d_blurred_image1);
+			  blur.setArg(2, blur_radius);
+			  blur.setArg(3, img.w);
+			  blur.setArg(4, img.h);
+			  blur.setArg(5, img.nchannels);
+			  //add_weighted.setArg(9, sizeof(unsigned char) * workGroupSize, nullptr);
+			  //add_weighted.setArg(10, sizeof(unsigned char) * workGroupSize, nullptr);
+			  // Execute Kernel
+			  queue.enqueueNDRangeKernel(
+				  blur,
+				  cl::NullRange,
+				  cl::NDRange(img.w, img.h),
+				  cl::NullRange /* cl::NDRange(workGroupSize)*/,
+				  NULL,
+				  &event);
+
+			  // Set Kernel Arguments
+			  blur.setArg(0, buffers.d_blurred_image3);
+			  blur.setArg(1, buffers.d_blurred_image2);
+			  blur.setArg(2, blur_radius);
+			  blur.setArg(3, img.w);
+			  blur.setArg(4, img.h);
+			  blur.setArg(5, img.nchannels);
+			  //add_weighted.setArg(9, sizeof(unsigned char) * workGroupSize, nullptr);
+			  //add_weighted.setArg(10, sizeof(unsigned char) * workGroupSize, nullptr);
+			  // Execute Kernel
 			  queue.enqueueNDRangeKernel(
 				  blur,
 				  cl::NullRange,
@@ -251,14 +291,14 @@ int main(int argc, char *argv[])
 
 			  add_weighted.setArg(0, buffers.d_sharpened_image);
 			  add_weighted.setArg(1, buffers.d_original_image);
-			  add_weighted.setArg(2, val.alpha);
-			  add_weighted.setArg(3, buffers.d_blurred_image);
-			  add_weighted.setArg(4, val.beta);
-			  add_weighted.setArg(5, val.gamma);
+			  add_weighted.setArg(2, imgval.alpha);
+			  add_weighted.setArg(3, buffers.d_blurred_image3);
+			  add_weighted.setArg(4, imgval.beta);
+			  add_weighted.setArg(5, imgval.gamma);
 			  add_weighted.setArg(6, img.w);
 			  add_weighted.setArg(7, img.h);
 			  add_weighted.setArg(8, img.nchannels);
-
+			  // Execute Kernel
 			  queue.enqueueNDRangeKernel(
 				  add_weighted,
 				  cl::NullRange,
@@ -266,7 +306,7 @@ int main(int argc, char *argv[])
 				  cl::NullRange,
 				  NULL,
 				  &event);
-
+		
 			  auto add_WeightedKernelPostTimer = std::chrono::steady_clock::now();
 
 			  queue.finish();
