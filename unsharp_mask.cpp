@@ -13,8 +13,8 @@
 
 int main(int argc, char *argv[])
 {
-		const char *ifilename = argc > 1 ? argv[1] : /*"../../goldhillin.ppm";*/     "../../ghost-town-8kin.ppm";    /* "../../gothicin.ppm";*//*"../../WhiteStreetIn.ppm";*/
-		const char *ofilename = argc > 2 ? argv[2] : /*"../../goldhillout.ppm";*/   "../../ghost-town-8kout.ppm";    /*"../../gothicout.ppm";*/ /*"../../WhiteStreetOut.ppm";*/
+		const char *ifilename = argc > 1 ? argv[1] : "../../goldhillin.ppm";     /*"../../ghost-town-8kin.ppm";*/    /* "../../gothicin.ppm";*//*"../../WhiteStreetIn.ppm";*/
+		const char *ofilename = argc > 2 ? argv[2] : "../../goldhillout.ppm";   /*"../../ghost-town-8kout.ppm";*/    /*"../../gothicout.ppm";*/ /*"../../WhiteStreetOut.ppm";*/
 		const int blur_radius = argc > 3 ? std::atoi(argv[3]) : 5;
 
   ppm img;
@@ -23,7 +23,7 @@ int main(int argc, char *argv[])
   struct Buffers 
   {
 	  std::vector<unsigned char> h_original_image, h_blurred_image, h_sharpened_image;
-	  cl::Buffer d_original_image, /*d_blurred_image,*/ d_sharpened_image;
+	  cl::Buffer d_original_image, d_sharpened_image;
 	  cl::Buffer d_blurred_image1, d_blurred_image2, d_blurred_image3;
   }buffers;
   
@@ -94,25 +94,27 @@ int main(int argc, char *argv[])
   // Defaults to CPU in case there are no GPUs.
   deviceSelection = CL_DEVICE_TYPE_CPU;
   for (std::vector<cl::Platform>::iterator plat = platforms.begin(); plat != platforms.end(); plat++)
-  {
+  {	 
 	  std::string s;
 	  plat->getInfo(CL_PLATFORM_VENDOR, &s);
 	  if (s == "NVIDIA Corporation")
 	  {
 		  deviceSelection = CL_DEVICE_TYPE_GPU;
-		 // useHostPointer = true;
+		  std::cout << "NVIDIA GPU Selected." << std::endl;
 		  break;
 	  }
-	  else if(s == "Advanced Micro Devices, Inc.")
+	  else if(s == "Advanced Micro Devices, Inc." && plat == platforms.end())
 	  {
 		  deviceSelection = CL_DEVICE_TYPE_GPU;
-		 // useHostPointer = true;
+		  std::cout << "AMD GPU Selected." << std::endl;
+		  break;
 	  }
-
-	 //device->getInfo(CL_DEVICE_TYPE, &s);
-	 // dev->getInfo(CL_DEVICE_VENDOR, &s);
+	
   }
-
+  if (deviceSelection == CL_DEVICE_TYPE_CPU)
+  {
+	  std::cout << "CPU Selected." << std::endl;
+  }
   // Create a context
   cl::Context context(deviceSelection);
 
@@ -191,7 +193,13 @@ int main(int argc, char *argv[])
 	  // Build the cl file to check for errors.
 	  program.build(context.getInfo<CL_CONTEXT_DEVICES>());
 	  // Create the kernel
-	  cl::Kernel blur = cl::Kernel(program, "blur");
+	  auto blur = cl::make_kernel<cl::Buffer,
+								  cl::Buffer,
+								  const int,
+							      const unsigned,
+							      const unsigned,
+							      const unsigned>(program, "blur");
+
 
 	  // Create Add_Weighted Kernel
 	  program = cl::Program(context, util::loadProgram("../../add_weighted.cl"));
@@ -199,13 +207,24 @@ int main(int argc, char *argv[])
 	  program.build(context.getInfo<CL_CONTEXT_DEVICES>());
 
 	  // Create the kernel 
-	  cl::Kernel add_weighted = cl::Kernel(program, "add_weighted");
+	  auto add_weighted = cl::make_kernel<cl::Buffer,
+										  cl::Buffer,
+										  const float,
+										  cl::Buffer,
+										  const float,
+										  const float,
+										  const unsigned int,
+										  const unsigned int,
+										  const unsigned int>(program, "add_weighted");
 
-	  //auto workGroupSize = add_weighted.getWorkGroupInfo<CL_KERNEL_WORK_GROUP_SIZE>(cl::Device::getDefault());
-	  //auto numWorkGroups = h_original_image.size() / workGroupSize;
+	  //L auto workGroupSize = add_weighted.getWorkGroupInfo<CL_KERNEL_WORK_GROUP_SIZE>(cl::Device::getDefault());
+	  //L auto numWorkGroups = h_original_image.size() / workGroupSize;
 
 	  std::cout << "Parallel process is being cycled to filter out erroneous values, please be patient... \n" << std::endl;
-
+	  //Assign buffer
+	  buffers.d_original_image = cl::Buffer(context, buffers.h_original_image.begin(), buffers.h_original_image.end(), CL_MEM_READ_ONLY, true);
+	  buffers.d_sharpened_image = cl::Buffer(context, buffers.h_sharpened_image.begin(), buffers.h_sharpened_image.end(), CL_MEM_READ_WRITE, true);
+	  
 	  for (int i = 0; i < (testCaseSize + testCaseIgnoreBuffer); i++)
 	  {
 			  //////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -217,99 +236,67 @@ int main(int argc, char *argv[])
 			  auto bufferAssignmentPreTimer = std::chrono::steady_clock::now();
 
 			  //Assign buffers
-			  buffers.d_original_image = cl::Buffer(context, buffers.h_original_image.begin(), buffers.h_original_image.end(), CL_MEM_READ_ONLY, true);
 			  buffers.d_blurred_image1 = cl::Buffer(context, buffers.h_blurred_image.begin(), buffers.h_blurred_image.end(), CL_MEM_READ_WRITE, true);
-
-			  //Assign buffer
-			  buffers.d_sharpened_image = cl::Buffer(context, buffers.h_sharpened_image.begin(), buffers.h_sharpened_image.end(), CL_MEM_READ_WRITE, true);
+			  buffers.d_blurred_image2 = cl::Buffer(context, buffers.h_blurred_image.begin(), buffers.h_blurred_image.end(), CL_MEM_READ_WRITE, true);
 
 			  auto bufferAssignmentPostTimer = std::chrono::steady_clock::now();
 
-			  // d_sharpened_image = cl::Buffer(context, sizeof(insigned char) * numWorkGroups, CL_MEM_READ_WRITE, true);
-			   // Since this is empty space it could just be allocated as such instead of being copied here?
+			  auto kernelsPreTimer = std::chrono::steady_clock::now();
+		
+			  // Execute Blur Kernels
+				blur(
+					  cl::EnqueueArgs(
+					  queue,
+					  cl::NDRange(img.w, img.h)),
+					  buffers.d_blurred_image1,
+					  buffers.d_original_image,
+					  blur_radius,
+				      img.w,
+				      img.h,
+				      img.nchannels);
 
-			  auto blurKernelPreTimer = std::chrono::steady_clock::now();
-			  // Set Kernel Arguments
-			  blur.setArg(0, buffers.d_blurred_image1);
-			  blur.setArg(1, buffers.d_original_image);
-			  blur.setArg(2, blur_radius);
-			  blur.setArg(3, img.w);
-			  blur.setArg(4, img.h);
-			  blur.setArg(5, img.nchannels);
-			  //add_weighted.setArg(9, sizeof(unsigned char) * workGroupSize, nullptr);
-			  //add_weighted.setArg(10, sizeof(unsigned char) * workGroupSize, nullptr);
-			  // Execute Kernel
-			  queue.enqueueNDRangeKernel(
-				  blur,
-				  cl::NullRange,
-				  cl::NDRange(img.w, img.h),
-				  cl::NullRange /* cl::NDRange(workGroupSize)*/,
-				  NULL,
-				  &event);
+				blur(
+					cl::EnqueueArgs(
+						queue,
+						cl::NDRange(img.w, img.h)),
+					buffers.d_blurred_image2,
+					buffers.d_blurred_image1,
+					blur_radius,
+					img.w,
+					img.h,
+					img.nchannels);
 
-			  // Set Kernel Arguments
-			  blur.setArg(0, buffers.d_blurred_image2);
-			  blur.setArg(1, buffers.d_blurred_image1);
-			  blur.setArg(2, blur_radius);
-			  blur.setArg(3, img.w);
-			  blur.setArg(4, img.h);
-			  blur.setArg(5, img.nchannels);
-			  //add_weighted.setArg(9, sizeof(unsigned char) * workGroupSize, nullptr);
-			  //add_weighted.setArg(10, sizeof(unsigned char) * workGroupSize, nullptr);
-			  // Execute Kernel
-			  queue.enqueueNDRangeKernel(
-				  blur,
-				  cl::NullRange,
-				  cl::NDRange(img.w, img.h),
-				  cl::NullRange /* cl::NDRange(workGroupSize)*/,
-				  NULL,
-				  &event);
+				blur(
+					cl::EnqueueArgs(
+						queue,
+						cl::NDRange(img.w, img.h)),
+					buffers.d_blurred_image1,
+					buffers.d_blurred_image2,
+					blur_radius,
+					img.w,
+					img.h,
+					img.nchannels);
 
-			  // Set Kernel Arguments
-			  blur.setArg(0, buffers.d_blurred_image3);
-			  blur.setArg(1, buffers.d_blurred_image2);
-			  blur.setArg(2, blur_radius);
-			  blur.setArg(3, img.w);
-			  blur.setArg(4, img.h);
-			  blur.setArg(5, img.nchannels);
-			  //add_weighted.setArg(9, sizeof(unsigned char) * workGroupSize, nullptr);
-			  //add_weighted.setArg(10, sizeof(unsigned char) * workGroupSize, nullptr);
-			  // Execute Kernel
-			  queue.enqueueNDRangeKernel(
-				  blur,
-				  cl::NullRange,
-				  cl::NDRange(img.w, img.h),
-				  cl::NullRange /* cl::NDRange(workGroupSize)*/,
-				  NULL,
-				  &event);
-
-			  auto blurKernelPostTimer = std::chrono::steady_clock::now();
 			  //////////////////////////////////////////////////////////////////////////////////////////////////////
 			  //////////////////////////////// Blur operation finished, now Add_Weighted ///////////////////////////
 			  //////////////////////////////////////////////////////////////////////////////////////////////////////
-			  auto add_WeightedKernelPreTimer = std::chrono::steady_clock::now();
+			  // Execute Add_Weigted Kernel
+			  add_weighted(
+				  cl::EnqueueArgs(
+					  queue,
+					  cl::NDRange(img.w, img.h)),
+				  buffers.d_sharpened_image,
+				  buffers.d_original_image,
+				  imgval.alpha,
+				  buffers.d_blurred_image1,
+				  imgval.beta,
+				  imgval.gamma,
+				  img.w,
+				  img.h,
+				  img.nchannels);
 
-			  add_weighted.setArg(0, buffers.d_sharpened_image);
-			  add_weighted.setArg(1, buffers.d_original_image);
-			  add_weighted.setArg(2, imgval.alpha);
-			  add_weighted.setArg(3, buffers.d_blurred_image3);
-			  add_weighted.setArg(4, imgval.beta);
-			  add_weighted.setArg(5, imgval.gamma);
-			  add_weighted.setArg(6, img.w);
-			  add_weighted.setArg(7, img.h);
-			  add_weighted.setArg(8, img.nchannels);
-			  // Execute Kernel
-			  queue.enqueueNDRangeKernel(
-				  add_weighted,
-				  cl::NullRange,
-				  cl::NDRange(img.w, img.h),
-				  cl::NullRange,
-				  NULL,
-				  &event);
-		
-			  auto add_WeightedKernelPostTimer = std::chrono::steady_clock::now();
+			  auto kernelsPostTimer = std::chrono::steady_clock::now();
 
-			  queue.finish();
 			  //////////////////////////////////////////////////////////////////////////////////////////////////////
 			  /////////////////// Add_Weighted finished, now copy back to host buffer for writing //////////////////
 			  //////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -334,15 +321,10 @@ int main(int argc, char *argv[])
 				  << std::setprecision(1)
 				  << std::chrono::duration<double,std::ratio<1,1000>>(bufferAssignmentPostTimer - bufferAssignmentPreTimer).count()
 				  << " milliseconds.\n"
-				  << "Blur kernel took "
+				  << "Kernels took "
 				  << std::fixed
 				  << std::setprecision(1)
-				  << std::chrono::duration<double, std::ratio<1, 1000>>(blurKernelPostTimer - blurKernelPreTimer).count()
-				  << " milliseconds.\n"
-				  << "Add_Weighted kernel took "
-				  << std::fixed
-				  << std::setprecision(1)
-				  << std::chrono::duration<double, std::ratio<1, 1000>>(add_WeightedKernelPostTimer - add_WeightedKernelPreTimer).count()
+				  << std::chrono::duration<double, std::ratio<1, 1000>>(kernelsPostTimer - kernelsPreTimer).count()
 				  << " milliseconds.\n"
 				  << "Copying back to host took "
 				  << std::chrono::duration<double, std::ratio<1, 1000>>(copyToHostPostTimer - copyToHostPreTimer).count()

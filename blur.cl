@@ -23,8 +23,6 @@ void pixel_average(
 	const unsigned h,
 	const unsigned nchannels)
 {
-	//for (int i = 0; i < 3; i++)
-	//{ 
 		float red_total = 0, green_total = 0, blue_total = 0;
 
 		for (int j = y - blur_radius + 1; j < y + blur_radius; ++j) {
@@ -43,7 +41,6 @@ void pixel_average(
 	out[byte_offset + 0] = red_total / nsamples;
 	out[byte_offset + 1] = green_total / nsamples;
 	out[byte_offset + 2] = blue_total / nsamples;
-	//}
 }
 
 __kernel void blur(
@@ -54,11 +51,8 @@ __kernel void blur(
 	const unsigned h,
 	const unsigned nchannels)
 {
-	/*for (int i = 0; i < 3; i++)
-	{*/
 		int x = get_global_id(0);
 		int y = get_global_id(1);
 		//barrier(CLK_GLOBAL_MEM_FENCE);
 		pixel_average(out, in, x, y, blur_radius, w, h, nchannels);
-	/*}*/
 }
