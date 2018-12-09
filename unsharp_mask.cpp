@@ -13,8 +13,8 @@
 
 int main(int argc, char *argv[])
 {
-		const char *ifilename = argc > 1 ? argv[1] : "../../goldhillin.ppm";     /*"../../ghost-town-8kin.ppm";*/    /* "../../gothicin.ppm";*//*"../../WhiteStreetIn.ppm";*/
-		const char *ofilename = argc > 2 ? argv[2] : "../../goldhillout.ppm";   /*"../../ghost-town-8kout.ppm";*/    /*"../../gothicout.ppm";*/ /*"../../WhiteStreetOut.ppm";*/
+		const char *ifilename = argc > 1 ? argv[1] :/* "../../goldhillin.ppm"; */    "../../ghost-town-8kin.ppm";    /* "../../gothicin.ppm";*//*"../../WhiteStreetIn.ppm";*/
+		const char *ofilename = argc > 2 ? argv[2] :/* "../../goldhillout.ppm"; */  "../../ghost-town-8kout.ppm";    /*"../../gothicout.ppm";*/ /*"../../WhiteStreetOut.ppm";*/
 		const int blur_radius = argc > 3 ? std::atoi(argv[3]) : 5;
 
   ppm img;
@@ -24,7 +24,7 @@ int main(int argc, char *argv[])
   {
 	  std::vector<unsigned char> h_original_image, h_blurred_image, h_sharpened_image;
 	  cl::Buffer d_original_image, d_sharpened_image;
-	  cl::Buffer d_blurred_image1, d_blurred_image2, d_blurred_image3;
+	  cl::Buffer d_blurred_image1, d_blurred_image2;
   }buffers;
   
   struct ImageValues
@@ -139,7 +139,7 @@ int main(int argc, char *argv[])
   //////////////////////////////////////////////////////////////////////////////////////////////////////
   double serialExecutionResult = 0, serialExecutionAverage = 0;
 
-  /*std::cout << "Serial process is being cycled to filter out erroneous values, please be patient... \n"<< std::endl;
+  std::cout << "Serial process is being cycled to filter out erroneous values, please be patient... \n"<< std::endl;
 
   for (int i = 0; i < (testCaseSize + testCaseIgnoreBuffer); i++)
   {
@@ -170,7 +170,7 @@ int main(int argc, char *argv[])
 	  << std::setprecision(1)
 	  << (serialExecutionAverage /= testCaseSize)
 	  << " milliseconds.\n"
-	  << std::endl;*/
+	  << std::endl;
   //////////////////////////////////////////////////////////////////////////////////////////////////////
   ////////////////////////////////////// Serial Execution END //////////////////////////////////////////
   //////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -394,7 +394,7 @@ int main(int argc, char *argv[])
 
   img.write(ofilename, buffers.h_sharpened_image);
 
-  std::cout << "Writing complete." << ofilename << "\n" << std::endl;
+  std::cout << "Writing complete to " << ofilename << ".\n" << std::endl;
 
   system("pause");
   return 0;
