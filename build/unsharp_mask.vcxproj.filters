@@ -1,0 +1,43 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="16.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="C:\Users\strea\Desktop\Repos\Unsharp_Mask\sources\unsharp_mask.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="C:\Users\strea\Desktop\Repos\Unsharp_Mask\headers\add_weighted.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\strea\Desktop\Repos\Unsharp_Mask\headers\blur.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\strea\Desktop\Repos\Unsharp_Mask\headers\err_code.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\strea\Desktop\Repos\Unsharp_Mask\headers\ppm.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\strea\Desktop\Repos\Unsharp_Mask\headers\unsharp_mask.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\strea\Desktop\Repos\Unsharp_Mask\headers\util.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\strea\Desktop\Repos\Unsharp_Mask\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="C:\Users\strea\Desktop\Repos\Unsharp_Mask\sources\add_weighted.cl" />
+    <None Include="C:\Users\strea\Desktop\Repos\Unsharp_Mask\sources\blur.cl" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{F141D4D6-5150-3515-97BF-2DCAA9FD77AF}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{5781E5EF-C8B9-3963-831B-46EF12B5BD75}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

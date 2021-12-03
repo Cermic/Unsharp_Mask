@@ -1,5 +1,0 @@
-MSVC Optimisations -> In build VS optimazations. How much difference does it make?
-
-Pre compiled headers for faster build times? Is this something that could get marks?
-
-Big 8k image size is a power of 2 as opposed to the small one which is not, this should make the parrallelised code make larger gains on the big image than the small one as a ratio.

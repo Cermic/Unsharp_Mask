@@ -1,0 +1,10 @@
+^C:\USERS\STREA\DESKTOP\REPOS\UNSHARP_MASK\BUILD\CMAKEFILES\79B828E1563CF16FCA8E57F15A488605\GENERATE.STAMP.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SC:/Users/strea/Desktop/Repos/Unsharp_Mask -BC:/Users/strea/Desktop/Repos/Unsharp_Mask/build --check-stamp-list CMakeFiles/generate.stamp.list --vs-solution-file C:/Users/strea/Desktop/Repos/Unsharp_Mask/build/unsharp_mask.sln
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd

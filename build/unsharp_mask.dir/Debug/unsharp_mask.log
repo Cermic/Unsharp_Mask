@@ -1,0 +1,38 @@
+﻿  unsharp_mask.cpp
+C:\Users\strea\Desktop\Repos\Unsharp_Mask\headers\blur.hpp(15,42): warning C4018: '>=': signed/unsigned mismatch
+C:\Users\strea\Desktop\Repos\Unsharp_Mask\headers\blur.hpp(17,42): warning C4018: '>=': signed/unsigned mismatch
+C:\Users\strea\Desktop\Repos\Unsharp_Mask\headers\blur.hpp(27,35): warning C4244: '=': conversion from 'float' to 'unsigned char', possible loss of data
+C:\Users\strea\Desktop\Repos\Unsharp_Mask\headers\blur.hpp(28,35): warning C4244: '=': conversion from 'float' to 'unsigned char', possible loss of data
+C:\Users\strea\Desktop\Repos\Unsharp_Mask\headers\blur.hpp(29,35): warning C4244: '=': conversion from 'float' to 'unsigned char', possible loss of data
+C:\Users\strea\Desktop\Repos\Unsharp_Mask\headers\blur.hpp(36,21): warning C4018: '<': signed/unsigned mismatch
+C:\Users\strea\Desktop\Repos\Unsharp_Mask\headers\blur.hpp(37,23): warning C4018: '<': signed/unsigned mismatch
+  cl_version.h: CL_TARGET_OPENCL_VERSION is not defined. Defaulting to 220 (OpenCL 2.2)
+C:\Users\strea\Desktop\Repos\Unsharp_Mask\dependencies\opencl-headers-msvc\CL/cl.hpp(4664,21): warning C4996: 'clCreateSampler': was declared deprecated
+C:\Users\strea\Desktop\Repos\Unsharp_Mask\dependencies\opencl-headers-msvc\CL/cl.hpp(5524,25): warning C4996: 'clCreateCommandQueue': was declared deprecated
+C:\Users\strea\Desktop\Repos\Unsharp_Mask\dependencies\opencl-headers-msvc\CL/cl.hpp(5555,21): warning C4996: 'clCreateCommandQueue': was declared deprecated
+C:\Users\strea\Desktop\Repos\Unsharp_Mask\dependencies\opencl-headers-msvc\CL/cl.hpp(5572,21): warning C4996: 'clCreateCommandQueue': was declared deprecated
+C:\Users\strea\Desktop\Repos\Unsharp_Mask\dependencies\opencl-headers-msvc\CL/cl.hpp(6378,15): warning C4996: 'clEnqueueTask': was declared deprecated
+C:\Users\strea\Desktop\Repos\Unsharp_Mask\sources\unsharp_mask.cpp(227,139): warning C4305: 'argument': truncation from 'int' to 'bool'
+C:\Users\strea\Desktop\Repos\Unsharp_Mask\headers\add_weighted.hpp(14,21): warning C4018: '<': signed/unsigned mismatch
+C:\Users\strea\Desktop\Repos\Unsharp_Mask\headers\unsharp_mask.hpp(22): message : see reference to function template instantiation 'void add_weighted<float>(unsigned char *,const unsigned char *,const T,const unsigned char *,const T,const T,const unsigned int,const unsigned int,const unsigned int)' being compiled
+          with
+          [
+              T=float
+          ]
+C:\Users\strea\Desktop\Repos\Unsharp_Mask\headers\add_weighted.hpp(15,23): warning C4018: '<': signed/unsigned mismatch
+C:\Users\strea\Desktop\Repos\Unsharp_Mask\headers\add_weighted.hpp(19,32): warning C4244: '=': conversion from 'T' to 'unsigned char', possible loss of data
+          with
+          [
+              T=float
+          ]
+C:\Users\strea\Desktop\Repos\Unsharp_Mask\headers\add_weighted.hpp(22,32): warning C4244: '=': conversion from 'T' to 'unsigned char', possible loss of data
+          with
+          [
+              T=float
+          ]
+C:\Users\strea\Desktop\Repos\Unsharp_Mask\headers\add_weighted.hpp(25,32): warning C4244: '=': conversion from 'T' to 'unsigned char', possible loss of data
+          with
+          [
+              T=float
+          ]
+  unsharp_mask.vcxproj -> C:\Users\strea\Desktop\Repos\Unsharp_Mask\build\Debug\unsharp_mask.exe
