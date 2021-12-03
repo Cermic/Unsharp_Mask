@@ -27,18 +27,18 @@ See the docs for a full explanation on how serial code was parrlellised using Op
 In conclusion, the serial program was adapted to function in a naïve parallel manner using global memory that was processed in parallel in multiple threads. This made it more effective than the serial version by up to a factor of 130. The more the blur size increased, the larger the gains the parallelised system had over the serial one. The GPU performed best on parallelism against the CPU in this case, it was able to complete faster than the CPU in all cases by up to a factor of 16. This advantage came through its larger thread capacity which meant more pixels could be processed at once. With careful use of the OpenCL API this program has been accelerated and the amount of acceleration will only improve as the problem size expands. As time passes and multithreaded hardware gets faster, OpenCL is an advantage as it will run on multiple device platforms and for the foreseeable future.
 
 ## Screenshots
- Goldhill Run                          |    Before Masking                     | After Masking                          |
-:-------------------------------------:|:-------------------------------------:|:---------------------------------------:
- ![](images/demo/goldhill-run)         | ![](images/demo/goldhill-in.PNG)      | ![](images/demo/goldhill-out.PNG)      |
+ Goldhill Run                              |    Before Masking                              | After Masking                                    |
+:-----------------------------------------:|:----------------------------------------------:|:-------------------------------------------------:
+ ![](images/demo/goldhill-run.PNG)         | ![](images/goldhill/goldhill-in.png)           | ![](images/goldhill/goldhill-out.png)            |
 
- Ghost Town Run                        |    Before Masking                     | After Masking                          |
-:-------------------------------------:|:-------------------------------------:|:---------------------------------------:
- ![](images/demo/ghost-town-run)       | ![](images/demo/ghost-town-8k-in.PNG) | ![](images/demo/ghost-town-8k-out.PNG) |
+ Ghost Town Run                            |    Before Masking                              | After Masking                                    |
+:-----------------------------------------:|:----------------------------------------------:|:-------------------------------------------------:
+ ![](images/demo/ghost-town-run.PNG)       | ![](images/ghost-town-8k/ghost-town-8k-in.png) | ![](images/ghost-town-8k/ghost-town-8k-out.png)  |
 
- Gothic Run                            |    Before Masking                     | After Masking                          |
-:-------------------------------------:|:-------------------------------------:|:---------------------------------------:
- ![](images/demo/gothic-run)           | ![](images/demo/gothic-in.PNG)        | ![](images/demo/gothic-out.PNG)        |
+ Gothic Run                                |    Before Masking                              | After Masking                                    |
+:-----------------------------------------:|:----------------------------------------------:|:-------------------------------------------------:
+ ![](images/demo/gothic-run.PNG)           | ![](images/gothic/gothic-in.png)               | ![](images/gothic/gothic-out.png)                |
 
- White Street Run                      |    Before Masking                     | After Masking                          |
-:-------------------------------------:|:-------------------------------------:|:---------------------------------------:
- ![](images/demo/white-street-run)     | ![](images/demo/white-street-in.PNG)  | ![](images/demo/white-street-out.PNG)  |
+ White Street Run                          |    Before Masking                              | After Masking                                    |
+:-----------------------------------------:|:----------------------------------------------:|:-------------------------------------------------:
+ ![](images/demo/white-street-run.PNG)     | ![](images/white-street/white-street-in.png)   | ![](images/white-street/white-street-out.png)    |
